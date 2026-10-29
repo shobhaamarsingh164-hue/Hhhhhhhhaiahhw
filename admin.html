@@ -1,0 +1,985 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="theme-color" content="#080b14">
+  <title>MovieVerse - Movies & Entertainment</title>
+
+  <style>
+    :root {
+      --bg: #080b14;
+      --panel: #111827;
+      --panel2: #182235;
+      --text: #f4f7ff;
+      --muted: #9ca9bd;
+      --accent: #7657ff;
+      --accent2: #a38fff;
+      --border: rgba(255,255,255,.09);
+      --danger: #ff6376;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Arial, Helvetica, sans-serif;
+    }
+
+    button, input {
+      font: inherit;
+    }
+
+    button {
+      cursor: pointer;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      padding: 15px 5%;
+      background: rgba(8,11,20,.94);
+      border-bottom: 1px solid var(--border);
+      backdrop-filter: blur(16px);
+    }
+
+    .brand {
+      font-size: 23px;
+      font-weight: 900;
+      white-space: nowrap;
+      letter-spacing: -.8px;
+    }
+
+    .brand span {
+      color: var(--accent2);
+    }
+
+    .search-wrap {
+      flex: 1;
+      max-width: 580px;
+      margin-left: auto;
+    }
+
+    #searchInput {
+      width: 100%;
+      padding: 12px 16px;
+      color: white;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      outline: none;
+    }
+
+    #searchInput:focus {
+      border-color: var(--accent);
+    }
+
+    .hero {
+      padding: 48px 5% 35px;
+      background:
+        radial-gradient(ellipse at 10% 20%, rgba(118,87,255,.22), transparent 48%),
+        radial-gradient(ellipse at 90% 10%, rgba(0,190,255,.12), transparent 42%);
+    }
+
+    .hero h1 {
+      margin: 0 0 12px;
+      font-size: clamp(30px, 6vw, 52px);
+      line-height: 1.1;
+    }
+
+    .hero p {
+      max-width: 650px;
+      color: var(--muted);
+      line-height: 1.7;
+    }
+
+    .section {
+      padding: 22px 5%;
+    }
+
+    .section-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 17px;
+    }
+
+    .section-heading h2 {
+      margin: 0;
+      font-size: 22px;
+    }
+
+    #movieCount {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    #categories {
+      display: flex;
+      gap: 9px;
+      overflow-x: auto;
+      padding: 2px 0 12px;
+      scrollbar-width: thin;
+    }
+
+    .category-btn {
+      flex: 0 0 auto;
+      padding: 9px 15px;
+      color: #d7ddef;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 30px;
+    }
+
+    .category-btn.active {
+      color: white;
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .movie-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(145px, 1fr));
+      gap: 19px;
+    }
+
+    .movie-card {
+      min-width: 0;
+      overflow: hidden;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 15px;
+      transition: transform .2s, border-color .2s;
+      cursor: pointer;
+    }
+
+    .movie-card:hover {
+      transform: translateY(-4px);
+      border-color: rgba(163,143,255,.7);
+    }
+
+    .poster {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 2 / 3;
+      background: var(--panel2);
+      overflow: hidden;
+    }
+
+    .poster img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .poster-placeholder {
+      height: 100%;
+      display: grid;
+      place-items: center;
+      padding: 10px;
+      text-align: center;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    .movie-info {
+      padding: 12px;
+    }
+
+    .movie-title {
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 1.4;
+      overflow-wrap: anywhere;
+    }
+
+    .movie-meta {
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .play-label {
+      display: inline-block;
+      margin-top: 11px;
+      padding: 7px 11px;
+      background: rgba(118,87,255,.17);
+      color: #c5b9ff;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: bold;
+    }
+
+    .status {
+      padding: 22px 5%;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .status.error {
+      color: var(--danger);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    /* Video player */
+    .player-section {
+      padding: 24px 5% 35px;
+      background: #0b101c;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .player-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 15px;
+      margin-bottom: 15px;
+    }
+
+    .player-heading h2 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      overflow-wrap: anywhere;
+    }
+
+    #playerDescription {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .player-shell {
+      width: 100%;
+      max-width: 1100px;
+      margin: 0 auto;
+      overflow: hidden;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      background: #000;
+    }
+
+    #playerFrame {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      background: #000;
+    }
+
+    #youtubePlayer,
+    #youtubePlayer iframe {
+      width: 100%;
+      height: 100%;
+      border: 0;
+      display: block;
+    }
+
+    .player-message {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      padding: 24px;
+      color: #e8eaf5;
+      text-align: center;
+      background: #05070c;
+      line-height: 1.6;
+      z-index: 2;
+    }
+
+    .player-controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 13px;
+      background: #101827;
+    }
+
+    .control-btn {
+      padding: 10px 15px;
+      color: white;
+      background: #202b40;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+    }
+
+    .control-btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .control-btn:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+    }
+
+    #playerStatus {
+      min-height: 24px;
+      padding: 12px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    footer {
+      padding: 30px 5%;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.7;
+    }
+
+    @media (max-width: 540px) {
+      .topbar {
+        flex-wrap: wrap;
+        gap: 12px;
+        padding: 13px 4%;
+      }
+
+      .brand {
+        font-size: 21px;
+      }
+
+      .search-wrap {
+        flex-basis: 100%;
+        max-width: none;
+      }
+
+      .hero {
+        padding: 32px 4% 22px;
+      }
+
+      .section,
+      .player-section {
+        padding-left: 4%;
+        padding-right: 4%;
+      }
+
+      .movie-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .movie-info {
+        padding: 10px;
+      }
+
+      .movie-title {
+        font-size: 14px;
+      }
+
+      .player-shell {
+        border-radius: 10px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <header class="topbar">
+    <div class="brand">Movie<span>Verse</span></div>
+    <div class="search-wrap">
+      <input
+        id="searchInput"
+        type="search"
+        placeholder="Search movies..."
+        aria-label="Search movies"
+        autocomplete="off"
+      >
+    </div>
+  </header>
+
+  <section class="hero">
+    <h1>Discover your next movie.</h1>
+    <p>
+      Explore movies, browse categories and enjoy videos in the built-in
+      player. Select a movie to see its details and play an available video.
+    </p>
+  </section>
+
+  <section id="playerSection" class="player-section hidden">
+    <div class="player-heading">
+      <div>
+        <h2 id="playerTitle">Now Playing</h2>
+        <div id="playerDescription"></div>
+      </div>
+    </div>
+
+    <div class="player-shell" id="playerShell">
+      <div id="playerFrame">
+        <div id="youtubePlayer"></div>
+        <div id="playerMessage" class="player-message">
+          Select a movie to load its video.
+        </div>
+      </div>
+
+      <div class="player-controls">
+        <button id="playPauseBtn" class="control-btn primary" disabled>
+          Play
+        </button>
+        <button id="fullscreenBtn" class="control-btn" disabled>
+          Fullscreen
+        </button>
+        <button id="closePlayerBtn" class="control-btn">
+          Close Player
+        </button>
+      </div>
+    </div>
+
+    <div id="playerStatus" role="status" aria-live="polite"></div>
+  </section>
+
+  <main>
+    <section class="section">
+      <div class="section-heading">
+        <h2>Categories</h2>
+      </div>
+      <div id="categories">
+        <button class="category-btn active" data-category="All">All</button>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-heading">
+        <h2 id="listHeading">Explore Movies</h2>
+        <span id="movieCount"></span>
+      </div>
+
+      <div id="loadingStatus" class="status">Connecting to MovieVerse...</div>
+      <div id="errorStatus" class="status error hidden"></div>
+      <div id="movieGrid" class="movie-grid"></div>
+      <div id="emptyStatus" class="status hidden">No movies match your search.</div>
+    </section>
+  </main>
+
+  <footer>
+    MovieVerse · Movie information and playback depend on the availability
+    and embedding permissions of each video.
+  </footer>
+
+  <!-- Firebase compatibility SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+  <!-- YouTube IFrame Player API -->
+  <script src="https://www.youtube.com/iframe_api"></script>
+
+  <script>
+    "use strict";
+
+    // Keep the existing Firebase project configuration.
+    const FIREBASE_CONFIG = {
+      apiKey: "AIzaSyC6hwu326CWzHAixRtOHnmLC0kychgw9e4",
+      authDomain: "gsbyz-63ac3.firebaseapp.com",
+      databaseURL: "https://gsbyz-63ac3-default-rtdb.firebaseio.com",
+      projectId: "gsbyz-63ac3",
+      storageBucket: "gsbyz-63ac3.firebasestorage.app",
+      messagingSenderId: "860577871628",
+      appId: "1:860577871628:web:62d516ec86b234f6b1fb29"
+    };
+
+    const MOVIES_PATH = "movies";
+
+    let database = null;
+    let allMovies = [];
+    let selectedCategory = "All";
+    let searchTerm = "";
+    let player = null;
+    let playerApiReady = false;
+    let pendingVideoId = null;
+    let currentMovie = null;
+    let playerReady = false;
+    let playerState = -1;
+
+    const $ = (id) => document.getElementById(id);
+
+    function setPlayerStatus(message) {
+      $("playerStatus").textContent = message || "";
+    }
+
+    function showPlayerMessage(message) {
+      const box = $("playerMessage");
+      box.textContent = message;
+      box.classList.remove("hidden");
+    }
+
+    function hidePlayerMessage() {
+      $("playerMessage").classList.add("hidden");
+    }
+
+    function safeText(value) {
+      return value == null ? "" : String(value).trim();
+    }
+
+    function getMovieValue(movie, keys) {
+      for (const key of keys) {
+        if (movie && movie[key] != null && String(movie[key]).trim() !== "") {
+          return movie[key];
+        }
+      }
+      return "";
+    }
+
+    // Supports YouTube video IDs, watch URLs, youtu.be URLs and embed URLs.
+    function extractYouTubeId(input) {
+      const value = safeText(input);
+      if (!value) return "";
+
+      // A normal YouTube video ID is 11 characters.
+      if (/^[a-zA-Z0-9_-]{11}$/.test(value)) {
+        return value;
+      }
+
+      try {
+        const url = new URL(value, window.location.href);
+        const host = url.hostname.toLowerCase().replace(/^www\./, "");
+
+        if (host === "youtu.be") {
+          const id = url.pathname.split("/").filter(Boolean)[0] || "";
+          return /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : "";
+        }
+
+        if (
+          host === "youtube.com" ||
+          host === "m.youtube.com" ||
+          host === "youtube-nocookie.com" ||
+          host === "music.youtube.com"
+        ) {
+          let id = url.searchParams.get("v") || "";
+
+          if (!id) {
+            const parts = url.pathname.split("/").filter(Boolean);
+            if (
+              parts.length >= 2 &&
+              ["embed", "shorts", "live", "v"].includes(parts[0])
+            ) {
+              id = parts[1];
+            }
+          }
+
+          return /^[a-zA-Z0-9_-]{11}$/.test(id) ? id : "";
+        }
+      } catch (error) {
+        console.warn("Could not parse video URL:", error);
+      }
+
+      return "";
+    }
+
+    function normalizeMovie(key, raw) {
+      const movie = raw && typeof raw === "object" ? raw : {};
+
+      return {
+        id: key,
+        title: safeText(getMovieValue(movie, ["title", "name"])) || "Untitled Movie",
+        category: safeText(getMovieValue(movie, ["category", "genre"])) || "Other",
+        poster: safeText(getMovieValue(movie, ["poster", "image", "thumbnail"])),
+        year: safeText(getMovieValue(movie, ["year", "releaseYear"])),
+        description: safeText(getMovieValue(movie, ["description", "overview", "details"])),
+        video: safeText(getMovieValue(movie, ["video", "videoUrl", "youtube", "youtubeUrl", "videoId"]))
+      };
+    }
+
+    function initializeFirebase() {
+      try {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(FIREBASE_CONFIG);
+        }
+
+        database = firebase.database();
+        database.ref(MOVIES_PATH).on(
+          "value",
+          (snapshot) => {
+            const value = snapshot.val() || {};
+
+            allMovies = Object.entries(value)
+              .filter(([, item]) => item && typeof item === "object")
+              .map(([key, item]) => normalizeMovie(key, item));
+
+            $("loadingStatus").classList.add("hidden");
+            $("errorStatus").classList.add("hidden");
+
+            renderCategories();
+            renderMovies();
+          },
+          (error) => {
+            console.error("Firebase read error:", error);
+            $("loadingStatus").classList.add("hidden");
+            $("errorStatus").textContent =
+              "Could not load movies from Firebase. Check the Realtime Database rules, database URL and internet connection.";
+            $("errorStatus").classList.remove("hidden");
+          }
+        );
+      } catch (error) {
+        console.error("Firebase initialization error:", error);
+        $("loadingStatus").classList.add("hidden");
+        $("errorStatus").textContent =
+          "Firebase could not initialize. Check the Firebase config and browser console.";
+        $("errorStatus").classList.remove("hidden");
+      }
+    }
+
+    function renderCategories() {
+      const categories = [
+        "All",
+        ...new Set(
+          allMovies
+            .map(movie => movie.category)
+            .filter(category => category && category !== "Other")
+        )
+      ];
+
+      const container = $("categories");
+      container.replaceChildren();
+
+      categories.forEach(category => {
+        const button = document.createElement("button");
+        button.className =
+          "category-btn" + (category === selectedCategory ? " active" : "");
+        button.textContent = category;
+        button.dataset.category = category;
+
+        button.addEventListener("click", () => {
+          selectedCategory = category;
+          renderCategories();
+          renderMovies();
+        });
+
+        container.appendChild(button);
+      });
+
+      if (!categories.includes(selectedCategory)) {
+        selectedCategory = "All";
+        renderCategories();
+      }
+    }
+
+    function createMovieCard(movie) {
+      const card = document.createElement("article");
+      card.className = "movie-card";
+      card.tabIndex = 0;
+      card.setAttribute("role", "button");
+      card.setAttribute("aria-label", "Play " + movie.title);
+
+      const poster = document.createElement("div");
+      poster.className = "poster";
+
+      if (movie.poster) {
+        const img = document.createElement("img");
+        img.src = movie.poster;
+        img.alt = movie.title + " poster";
+        img.loading = "lazy";
+        img.referrerPolicy = "no-referrer";
+        img.onerror = () => {
+          img.remove();
+          const placeholder = document.createElement("div");
+          placeholder.className = "poster-placeholder";
+          placeholder.textContent = movie.title;
+          poster.appendChild(placeholder);
+        };
+        poster.appendChild(img);
+      } else {
+        const placeholder = document.createElement("div");
+        placeholder.className = "poster-placeholder";
+        placeholder.textContent = movie.title;
+        poster.appendChild(placeholder);
+      }
+
+      const info = document.createElement("div");
+      info.className = "movie-info";
+
+      const title = document.createElement("div");
+      title.className = "movie-title";
+      title.textContent = movie.title;
+
+      const meta = document.createElement("div");
+      meta.className = "movie-meta";
+      meta.textContent = [movie.year, movie.category].filter(Boolean).join(" · ");
+
+      const playLabel = document.createElement("div");
+      playLabel.className = "play-label";
+      playLabel.textContent = "▶ Watch movie";
+
+      info.append(title, meta, playLabel);
+      card.append(poster, info);
+
+      const open = () => openMovie(movie);
+      card.addEventListener("click", open);
+      card.addEventListener("keydown", event => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          open();
+        }
+      });
+
+      return card;
+    }
+
+    function renderMovies() {
+      const grid = $("movieGrid");
+      grid.replaceChildren();
+
+      const filtered = allMovies.filter(movie => {
+        const categoryMatches =
+          selectedCategory === "All" || movie.category === selectedCategory;
+
+        const searchable =
+          (movie.title + " " + movie.category + " " + movie.year + " " + movie.description)
+            .toLowerCase();
+
+        return categoryMatches && searchable.includes(searchTerm.toLowerCase());
+      });
+
+      $("movieCount").textContent = filtered.length + " movies";
+      $("listHeading").textContent =
+        selectedCategory === "All" ? "Explore Movies" : selectedCategory;
+
+      filtered.forEach(movie => grid.appendChild(createMovieCard(movie)));
+
+      $("emptyStatus").classList.toggle("hidden", filtered.length !== 0);
+    }
+
+    function openMovie(movie) {
+      currentMovie = movie;
+      $("playerSection").classList.remove("hidden");
+      $("playerTitle").textContent = movie.title;
+      $("playerDescription").textContent = movie.description || "";
+      $("playPauseBtn").disabled = true;
+      $("fullscreenBtn").disabled = false;
+      $("playPauseBtn").textContent = "Play";
+
+      const videoId = extractYouTubeId(movie.video);
+
+      if (!videoId) {
+        pendingVideoId = null;
+        playerReady = false;
+
+        if (player && typeof player.stopVideo === "function") {
+          try { player.stopVideo(); } catch (_) {}
+        }
+
+        showPlayerMessage(
+          movie.video
+            ? "This video's URL or ID is not a valid YouTube video. Check the video's field in Firebase."
+            : "No video URL is saved for this movie in Firebase."
+        );
+
+        setPlayerStatus("Add a valid YouTube video URL or 11-character video ID to this movie's video field.");
+        $("playerSection").scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+
+      pendingVideoId = videoId;
+      playerReady = false;
+      showPlayerMessage("Connecting to YouTube player...");
+      setPlayerStatus("Loading video…");
+
+      $("playerSection").scrollIntoView({ behavior: "smooth", block: "start" });
+
+      if (playerApiReady) {
+        createOrLoadPlayer(videoId);
+      }
+    }
+
+    // Called by the official YouTube IFrame API script.
+    window.onYouTubeIframeAPIReady = function () {
+      playerApiReady = true;
+      if (pendingVideoId) {
+        createOrLoadPlayer(pendingVideoId);
+      }
+    };
+
+    function createOrLoadPlayer(videoId) {
+      if (!videoId) return;
+
+      const pageOrigin = window.location.origin;
+
+      if (!pageOrigin || pageOrigin === "null" || !/^https?:/.test(pageOrigin)) {
+        showPlayerMessage(
+          "The page needs a valid HTTP or HTTPS origin. Open MovieVerse from its live Render HTTPS URL, not a file:// preview."
+        );
+        setPlayerStatus("A valid HTTPS page origin is required for reliable embedded playback.");
+        return;
+      }
+
+      if (player && typeof player.loadVideoById === "function") {
+        try {
+          player.loadVideoById(videoId);
+          return;
+        } catch (error) {
+          console.error("YouTube load error:", error);
+        }
+      }
+
+      if (player) {
+        try { player.destroy(); } catch (_) {}
+        player = null;
+      }
+
+      $("youtubePlayer").replaceChildren();
+
+      try {
+        player = new YT.Player("youtubePlayer", {
+          width: "100%",
+          height: "100%",
+          videoId: videoId,
+          playerVars: {
+            autoplay: 1,
+            controls: 1,
+            playsinline: 1,
+            rel: 0,
+            enablejsapi: 1,
+            origin: pageOrigin
+          },
+          events: {
+            onReady: function (event) {
+              playerReady = true;
+              $("playPauseBtn").disabled = false;
+              $("fullscreenBtn").disabled = false;
+              hidePlayerMessage();
+              setPlayerStatus("Player ready.");
+
+              try {
+                event.target.playVideo();
+              } catch (_) {}
+            },
+
+            onStateChange: function (event) {
+              playerState = event.data;
+
+              if (event.data === YT.PlayerState.PLAYING) {
+                $("playPauseBtn").textContent = "Pause";
+                hidePlayerMessage();
+                setPlayerStatus("Playing: " + (currentMovie ? currentMovie.title : "video"));
+              } else if (event.data === YT.PlayerState.PAUSED) {
+                $("playPauseBtn").textContent = "Play";
+                setPlayerStatus("Video paused.");
+              } else if (event.data === YT.PlayerState.ENDED) {
+                $("playPauseBtn").textContent = "Play";
+                setPlayerStatus("Video finished.");
+              } else if (event.data === YT.PlayerState.BUFFERING) {
+                setPlayerStatus("Buffering video…");
+              }
+            },
+
+            onError: function (event) {
+              playerReady = false;
+              $("playPauseBtn").disabled = true;
+
+              const messages = {
+                2: "Invalid video parameter. Check the YouTube video ID.",
+                5: "The video could not be played in the HTML5 player.",
+                100: "The video was removed, deleted or marked private.",
+                101: "The video owner does not allow embedded playback.",
+                150: "The video owner does not allow embedded playback.",
+                153: "YouTube did not receive the required HTTP Referer or client identification. Verify that this page is opened directly from its public HTTPS Render URL and that no proxy or referrer policy removes the Referer."
+              };
+
+              const message = messages[event.data] ||
+                ("YouTube player error: " + event.data);
+
+              showPlayerMessage(message);
+              setPlayerStatus(message);
+              console.error("YouTube IFrame API error:", event.data);
+            }
+          }
+        });
+      } catch (error) {
+        console.error("Player creation failed:", error);
+        showPlayerMessage("Could not initialize the YouTube player. Reload the page and try again.");
+        setPlayerStatus("Player initialization failed.");
+      }
+    }
+
+    $("searchInput").addEventListener("input", event => {
+      searchTerm = event.target.value.trim();
+      renderMovies();
+    });
+
+    $("playPauseBtn").addEventListener("click", () => {
+      if (!player || !playerReady) return;
+
+      try {
+        if (playerState === YT.PlayerState.PLAYING ||
+            playerState === YT.PlayerState.BUFFERING) {
+          player.pauseVideo();
+        } else {
+          player.playVideo();
+        }
+      } catch (error) {
+        console.error("Play/pause failed:", error);
+        setPlayerStatus("Could not control playback. Try again.");
+      }
+    });
+
+    $("fullscreenBtn").addEventListener("click", async () => {
+      const target = $("playerShell");
+
+      try {
+        if (document.fullscreenElement) {
+          await document.exitFullscreen();
+        } else if (target.requestFullscreen) {
+          await target.requestFullscreen();
+        } else {
+          setPlayerStatus("Fullscreen is not supported in this browser or WebView.");
+        }
+      } catch (error) {
+        console.error("Fullscreen failed:", error);
+        setPlayerStatus("Fullscreen was blocked by the browser or WebView.");
+      }
+    });
+
+    $("closePlayerBtn").addEventListener("click", () => {
+      pendingVideoId = null;
+      playerReady = false;
+
+      if (player && typeof player.stopVideo === "function") {
+        try { player.stopVideo(); } catch (_) {}
+      }
+
+      $("playerSection").classList.add("hidden");
+      $("playPauseBtn").textContent = "Play";
+      setPlayerStatus("");
+    });
+
+    document.addEventListener("fullscreenchange", () => {
+      $("fullscreenBtn").textContent =
+        document.fullscreenElement ? "Exit Fullscreen" : "Fullscreen";
+    });
+
+    window.addEventListener("online", () => {
+      if (database) {
+        setPlayerStatus("Internet connection restored.");
+      }
+    });
+
+    window.addEventListener("offline", () => {
+      setPlayerStatus("You are offline. Check your internet connection.");
+    });
+
+    // Start Firebase after page setup.
+    initializeFirebase();
+  </script>
+</body>
+</html>

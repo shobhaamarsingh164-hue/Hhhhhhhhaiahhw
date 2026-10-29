@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MovieVerse</title>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<style>
+:root{--bg:#121212;--sf:#1f1f1f;--tx:#fff;--mu:#a3a3a3;--red:#e50914;--bd:#333}
+:root[data-theme=light]{--bg:#f5f5f5;--sf:#fff;--tx:#141414;--mu:#666;--bd:#ddd}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;padding-bottom:70px}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 14px;display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--bd)}
+.logo{color:var(--red);font-weight:800;font-size:1.3rem;letter-spacing:.5px}
+#search{flex:1;min-width:0;background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:8px 12px}
+.chips{display:flex;gap:8px;overflow-x:auto;padding:10px 14px;scrollbar-width:none}
+.chip{flex:none;background:var(--sf);border:1px solid var(--bd);border-radius:20px;padding:6px 14px}
+.chip.on{background:var(--red);border-color:var(--red);color:#fff}
+.hero{margin:6px 14px 14px;border-radius:12px;padding:70px 18px 18px;background:linear-gradient(transparent,#000a),var(--g);color:#fff;min-height:210px;display:flex;flex-direction:column;justify-content:flex-end;gap:8px}
+.hero h2{font-size:1.7rem}
+.btn{background:var(--red);color:#fff;border:0;border-radius:8px;padding:10px 18px;font-weight:600}
+.btn.alt{background:var(--sf);color:var(--tx);border:1px solid var(--bd)}
+h3{padding:10px 14px 6px;font-size:1.05rem}
+.row{display:flex;gap:10px;overflow-x:auto;padding:0 14px 8px;scrollbar-width:none}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px;padding:10px 14px}
+.card{flex:none;width:120px;aspect-ratio:2/3;border-radius:8px;background:var(--g);color:#fff;border:0;padding:8px;text-align:left;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;position:relative;font-size:.85rem;font-weight:600}
+.grid .card{width:auto}
+.card img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.card span{position:relative;text-shadow:0 1px 4px #000}
+.empty{padding:40px 20px;text-align:center;color:var(--mu)}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--sf);border-top:1px solid var(--bd);z-index:5}
+nav button{flex:1;padding:14px 0;background:none;border:0;color:var(--mu);font-weight:600}
+nav button.on{color:var(--red)}
+.set{margin:14px;background:var(--sf);border:1px solid var(--bd);border-radius:12px}
+.set>div{display:flex;justify-content:space-between;align-items:center;padding:14px;border-bottom:1px solid var(--bd);gap:10px}
+.set>div:last-child{border:0}
+.sw{width:46px;height:26px;border-radius:13px;background:var(--bd);border:0;position:relative;flex:none}
+.sw::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:left .15s}
+.sw.on{background:var(--red)}.sw.on::after{left:23px}
+.ov{position:fixed;inset:0;background:var(--bg);z-index:20;display:flex;align-items:center;justify-content:center;padding:20px}
+.ov[hidden]{display:none}
+.box{width:100%;max-width:380px;display:flex;flex-direction:column;gap:12px}
+.box input{background:var(--sf);border:1px solid var(--bd);border-radius:8px;padding:12px}
+.tabs{display:flex;border-bottom:1px solid var(--bd)}
+.tabs button{flex:1;background:none;border:0;padding:10px;color:var(--mu);border-bottom:2px solid transparent}
+.tabs button.on{color:var(--tx);border-color:var(--red)}
+.err{color:#ff6b6b;min-height:1.2em;font-size:.9rem}
+.link{background:none;border:0;color:var(--mu);text-decoration:underline}
+.modal{align-items:flex-end;background:#000a}
+.sheet{background:var(--sf);color:var(--tx);width:100%;max-width:560px;border-radius:16px 16px 0 0;overflow:hidden}
+.sheet .top{height:160px;background:var(--g)}
+.sheet .in{padding:16px;display:flex;flex-direction:column;gap:10px}
+.sheet video{width:100%;max-height:260px;background:#000}
+.sheet iframe{width:100%;aspect-ratio:16/9;border:0;background:#000;display:block}
+.meta{color:var(--mu);font-size:.9rem}
+#splash{position:fixed;inset:0;z-index:60;background:#121212;display:flex;align-items:center;justify-content:center;transition:opacity .5s}
+#splash.out{opacity:0;pointer-events:none}
+#splash span{color:#e50914;font-size:clamp(1.8rem,9vw,3rem);font-weight:800;letter-spacing:3px;border-right:3px solid #e50914;padding-right:6px;min-height:1.2em;animation:blink .8s steps(1) infinite}
+@keyframes blink{50%{border-color:transparent}}
+@media (prefers-reduced-motion:reduce){#splash span{animation:none}}
+#toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:8px;z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
+#toast.on{opacity:1}
+</style>
+</head>
+<body>
+<div id="splash"><span id="spText" aria-label="MovieVerse"></span></div>
+
+<div id="auth" class="ov" hidden>
+  <div class="box">
+    <div class="logo" style="font-size:2rem">MOVIEVERSE</div>
+    <div class="tabs"><button id="tLogin" class="on">Log in</button><button id="tSignup">Sign up</button></div>
+    <input id="em" type="email" placeholder="Email" autocomplete="email">
+    <input id="pw" type="password" placeholder="Password (6+ characters)" autocomplete="current-password">
+    <div class="err" id="err"></div>
+    <button class="btn" id="go">Log in</button>
+    <button class="btn alt" id="gg">Continue with Google</button>
+    <button class="link" id="guest">Continue as guest</button>
+    <div class="meta" id="demoNote"></div>
+  </div>
+</div>
+
+<header><div class="logo">MOVIEVERSE</div><input id="search" type="search" placeholder="Search movies"></header>
+<div class="chips" id="chips"></div>
+<div id="banner" style="display:none;margin:4px 14px;padding:10px 14px;border-radius:8px;background:var(--red);color:#fff"></div>
+<main id="view"></main>
+<nav>
+  <button data-t="home" class="on">Home</button>
+  <button data-t="list">My List</button>
+  <button data-t="settings">Settings</button>
+</nav>
+<div id="modal" class="ov modal" hidden></div>
+<div id="toast"></div>
+
+<script>
+// ---------- CONFIG ----------
+// Paste your Firebase web config here to enable real login + shared movie database.
+// Leave as null to run in demo mode (works instantly, no backend).
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyC6hwu326CWzHAixRtOHnmLC0kychgw9e4",
+  authDomain: "gsbyz-63ac3.firebaseapp.com",
+  databaseURL: "https://gsbyz-63ac3-default-rtdb.firebaseio.com",
+  projectId: "gsbyz-63ac3",
+  storageBucket: "gsbyz-63ac3.firebasestorage.app",
+  messagingSenderId: "860577871628",
+  appId: "1:860577871628:web:62d516ec86b234f6b1fb29"
+};
+/* Example:
+const FIREBASE_CONFIG = {
+  apiKey:"...", authDomain:"...firebaseapp.com",
+  databaseURL:"https://...firebaseio.com", projectId:"...", appId:"..."
+};
+*/
+
+// ---------- helpers ----------
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store = {
+  get:(k,d)=>{try{return JSON.parse(localStorage.getItem(k))??d}catch{return d}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}}
+};
+const hue = t => [...String(t)].reduce((a,c)=>a+c.charCodeAt(0),0)*37 % 360;
+const grad = t => `linear-gradient(160deg,hsl(${hue(t)} 60% 32%),hsl(${(hue(t)+60)%360} 55% 14%))`;
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.id);toast.id=setTimeout(()=>t.classList.remove('on'),2200)}
+
+// ---------- data ----------
+let CATS = ['Action','Comedy','Drama','Horror','Romance','Sci-Fi','Thriller','Animation','Anime','Fanime','Documentary','Family','Fantasy','Crime'];
+let banner = null;
+const DEMO = ('Iron Tide|2024|Action|7.8;Last Convoy|2023|Action|7.1;Wrong Wedding|2022|Comedy|6.9;Office Ghosts|2024|Comedy|7.3;'+
+'The Quiet River|2021|Drama|8.2;Paper Homes|2023|Drama|7.9;Hollow Stairs|2024|Horror|6.8;Night Shift Nine|2022|Horror|6.5;'+
+'Monsoon Letters|2023|Romance|7.4;Second Spring|2024|Romance|7.0;Orbit Zero|2025|Sci-Fi|8.0;Glass Planet|2022|Sci-Fi|7.5;'+
+'Cold Signal|2024|Thriller|7.7;The Last Call|2021|Thriller|7.2;Pocket Dragons|2023|Animation|7.6;Moon Bakery|2024|Animation|8.1;'+
+'Salt & Sky|2022|Documentary|8.3;Wild Hands|2023|Documentary|7.9;Sunday Cousins|2024|Family|7.0;The Big Backyard|2021|Family|6.9;'+
+'Ember Crown|2025|Fantasy|7.8;Wolves of Alder|2023|Fantasy|7.4;Ledger City|2022|Crime|8.0;Back Alley Saints|2024|Crime|7.2')
+ .split(';').map((r,i)=>{const [title,year,category,rating]=r.split('|');
+   return {id:'d'+i,title,year,category,rating,desc:`A ${category.toLowerCase()} story from ${year}. Add your own description in the database.`}});
+let movies = [], cat = 'All', q = '', tab = 'home', user = null, list = [];
+let prefs = {theme:'dark',autoplay:true,saver:false,...store.get('mv_prefs',{})};
+function applyTheme(){document.documentElement.dataset.theme = prefs.theme}
+function savePrefs(){store.set('mv_prefs',prefs);applyTheme()}
+
+// ---------- backend (Firebase or demo) ----------
+const useFB = !!(window.firebase && FIREBASE_CONFIG);
+let auth, db;
+if (useFB) {
+  firebase.initializeApp(FIREBASE_CONFIG);
+  auth = firebase.auth(); db = firebase.database();
+  db.ref('movies').on('value', s => {
+    const v = s.val();
+    movies = v ? Object.entries(v).map(([id,m])=>({id,...m})) : DEMO;
+    render();
+  }, () => { movies = DEMO; render(); });
+  db.ref('categories').on('value', s => { const v = s.val(); if(v){ CATS = Object.values(v); render(); } });
+  db.ref('promotions/banner').on('value', s => { banner = s.val(); render(); });
+  auth.onAuthStateChanged(u => setUser(u ? {id:u.uid,email:u.email||(u.isAnonymous?'Guest':'Google user')} : null));
+} else {
+  const sm = store.get('mv_movies',null);
+  movies = sm && sm.length ? sm : DEMO;
+  CATS = store.get('mv_cats',CATS);
+  banner = store.get('mv_banner',null);
+  $('#demoNote').textContent = 'Demo mode: sign-in is simulated on this device. Add your Firebase config to enable real accounts.';
+  setUser(store.get('mv_session',null));
+}
+function setUser(u){
+  user = u; $('#auth').hidden = !!u;
+  list = u ? store.get('mv_list_'+u.id,[]) : [];
+  if (u && useFB && !u.id.startsWith('demo')) {
+    db.ref('users/'+u.id+'/list').once('value').then(s=>{ if(s.val()){list=s.val();store.set('mv_list_'+u.id,list);render()} }).catch(()=>{});
+  }
+  render();
+}
+function saveList(){
+  if(!user) return;
+  store.set('mv_list_'+user.id,list);
+  if(useFB) db.ref('users/'+user.id+'/list').set(list).catch(()=>{});
+}
+
+// ---------- auth UI ----------
+let mode = 'login';
+function setMode(m){mode=m;$('#tLogin').classList.toggle('on',m==='login');$('#tSignup').classList.toggle('on',m==='signup');$('#go').textContent=m==='login'?'Log in':'Create account';$('#err').textContent=''}
+$('#tLogin').onclick=()=>setMode('login'); $('#tSignup').onclick=()=>setMode('signup');
+$('#go').onclick = async () => {
+  const e=$('#em').value.trim(), p=$('#pw').value, er=$('#err');
+  if(!/^\S+@\S+\.\S+$/.test(e)) return er.textContent='Enter a valid email address.';
+  if(p.length<6) return er.textContent='Password must be at least 6 characters.';
+  try{
+    if(useFB){ mode==='login' ? await auth.signInWithEmailAndPassword(e,p) : await auth.createUserWithEmailAndPassword(e,p) }
+    else { const u={id:'demo_'+e,email:e}; store.set('mv_session',u); setUser(u) }
+  }catch(x){er.textContent=x.message}
+};
+$('#gg').onclick = async () => {
+  if(!useFB) return $('#err').textContent='Add your Firebase config to enable Google sign-in.';
+  try{await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider())}catch(x){$('#err').textContent=x.message}
+};
+$('#guest').onclick = async () => {
+  try{
+    if(useFB) await auth.signInAnonymously();
+    else { const u={id:'demo_guest',email:'Guest'}; store.set('mv_session',u); setUser(u) }
+  }catch(x){$('#err').textContent=x.message}
+};
+async function logout(){
+  if(useFB) await auth.signOut(); else { store.set('mv_session',null); setUser(null) }
+}
+
+// ---------- views ----------
+function cardHTML(m){
+  const img = m.poster ? `<img src="${esc(m.poster)}" alt="" loading="lazy">` : '';
+  return `<button class="card" data-id="${esc(m.id)}" style="--g:${grad(m.title)}">${img}<span>${esc(m.title)}</span></button>`;
+}
+function renderChips(){
+  $('#chips').innerHTML = ['All',...CATS].map(c=>`<button class="chip ${c===cat?'on':''}" data-c="${c}">${c}</button>`).join('');
+  $('#chips').style.display = tab==='home' ? '' : 'none';
+}
+function renderHome(){
+  const f = movies.filter(m => (cat==='All'||m.category===cat) && (!q || String(m.title).toLowerCase().includes(q)));
+  if(!f.length) return `<div class="empty">No movies found. Try another category or search.</div>`;
+  if(q || cat!=='All') return `<div class="grid">${f.map(cardHTML).join('')}</div>`;
+  const top = [...movies].sort((a,b)=>b.rating-a.rating)[0];
+  let h = prefs.saver ? '' : `<div class="hero" style="--g:${grad(top.title)}"><div class="meta" style="color:#ddd">Top rated · ${esc(top.rating)}</div><h2>${esc(top.title)}</h2><div><button class="btn" data-id="${esc(top.id)}">Watch details</button></div></div>`;
+  for(const c of CATS){
+    const r = movies.filter(m=>m.category===c); if(!r.length) continue;
+    h += `<h3>${c}</h3><div class="row">${r.map(cardHTML).join('')}</div>`;
+  }
+  return h;
+}
+function renderList(){
+  const r = movies.filter(m=>list.includes(m.id));
+  return r.length ? `<h3>My List</h3><div class="grid">${r.map(cardHTML).join('')}</div>` : `<div class="empty">Your list is empty. Open a movie and tap "Add to My List".</div>`;
+}
+function sw(id,on){return `<button class="sw ${on?'on':''}" id="${id}" role="switch" aria-checked="${on}"></button>`}
+function renderSettings(){
+  return `<h3>Settings</h3><div class="set">
+    <div><div>Account<div class="meta">${esc(user?user.email:'Not signed in')}</div></div></div>
+    <div><span>Dark theme</span>${sw('sTheme',prefs.theme==='dark')}</div>
+    <div><span>Autoplay next movie</span>${sw('sAuto',prefs.autoplay)}</div>
+    <div><span>Data saver (hide featured banner)</span>${sw('sSave',prefs.saver)}</div>
+    <div><span>Clear My List</span><button class="btn alt" id="sClear">Clear</button></div>
+    <div><span>Sign out</span><button class="btn" id="sOut">Log out</button></div>
+  </div>`;
+}
+function render(){
+  renderChips();
+  const bn = $('#banner');
+  bn.style.display = banner && banner.active && banner.text ? '' : 'none';
+  bn.textContent = banner && banner.text ? banner.text : '';
+  const v = $('#view');
+  v.innerHTML = tab==='home' ? renderHome() : tab==='list' ? renderList() : renderSettings();
+  if(tab==='settings'){
+    $('#sTheme').onclick=()=>{prefs.theme=prefs.theme==='dark'?'light':'dark';savePrefs();render()};
+    $('#sAuto').onclick=()=>{prefs.autoplay=!prefs.autoplay;savePrefs();render()};
+    $('#sSave').onclick=()=>{prefs.saver=!prefs.saver;savePrefs();render()};
+    $('#sClear').onclick=()=>{list=[];saveList();toast('My List cleared')};
+    $('#sOut').onclick=logout;
+  }
+}
+
+// ---------- modal ----------
+// For APK builds: set this to the HTTPS address of player.html, e.g. 'https://your-site.web.app/player.html'
+// Leave '' when the app itself is opened from an HTTPS address.
+const YT_PLAYER_PAGE = '';
+function ytId(u){
+  const r = String(u||'').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/))([\w-]{11})/);
+  return r ? r[1] : null;
+}
+function openMovie(id){
+  const m = movies.find(x=>x.id===id); if(!m) return;
+  const inList = list.includes(id);
+  const yt = ytId(m.video);
+  const media = yt
+    ? `<iframe src="${YT_PLAYER_PAGE ? esc(YT_PLAYER_PAGE)+'?v='+yt+'&a='+(prefs.autoplay?1:0) : 'https://www.youtube.com/embed/'+yt+'?rel=0&playsinline=1'+(prefs.autoplay?'&autoplay=1':'')}" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="${esc(m.title)}"></iframe>`
+    : m.video ? `<video controls ${prefs.autoplay?'autoplay':''} src="${esc(m.video)}"></video>` : `<div class="top" style="--g:${grad(m.title)}"></div>`;
+  const md = $('#modal');
+  md.innerHTML = `<div class="sheet">${media}<div class="in">
+    <h2>${esc(m.title)}</h2>
+    <div class="meta">${esc(m.year)} · ${esc(m.category)} · Rating ${esc(m.rating)}</div>
+    <p>${esc(m.desc||'')}</p>
+    <button class="btn" id="mPlay">Play</button>
+    <button class="btn alt" id="mList">${inList?'Remove from My List':'Add to My List'}</button>
+    <button class="link" id="mClose">Close</button></div></div>`;
+  md.hidden = false;
+  $('#mClose').onclick=()=>md.hidden=true;
+  md.onclick=e=>{if(e.target===md)md.hidden=true};
+  $('#mPlay').onclick=()=>toast(m.video?'Playing above':'No video link added for this movie');
+  $('#mList').onclick=()=>{
+    list = list.includes(id) ? list.filter(x=>x!==id) : [...list,id];
+    saveList(); md.hidden=true; render(); toast(list.includes(id)?'Added to My List':'Removed from My List');
+  };
+}
+
+// ---------- events ----------
+document.addEventListener('click', e => {
+  const c = e.target.closest('[data-c]'); if(c){cat=c.dataset.c;render();return}
+  const m = e.target.closest('[data-id]'); if(m){openMovie(m.dataset.id);return}
+  const t = e.target.closest('nav [data-t]');
+  if(t){tab=t.dataset.t;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b===t));render()}
+});
+$('#search').addEventListener('input', e => {q=e.target.value.trim().toLowerCase(); if(tab!=='home'){tab='home';document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==='home'))} render()});
+applyTheme(); render();
+</script>
+<script>
+// Typewriter splash: types "MOVIEVERSE", then fades out
+(function(){
+  const sp=document.getElementById('splash'), el=document.getElementById('spText'), word='MOVIEVERSE';
+  const done=()=>{sp.classList.add('out');setTimeout(()=>sp.remove(),600)};
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches){el.textContent=word;setTimeout(done,800);return}
+  let i=0;
+  const t=setInterval(()=>{el.textContent=word.slice(0,++i);if(i>=word.length){clearInterval(t);setTimeout(done,900)}},140);
+})();
+</script>
+</body>
+</html>
