@@ -63,6 +63,9 @@ nav button.on{color:var(--red)}
 #splash span{color:#e50914;font-size:clamp(1.8rem,9vw,3rem);font-weight:800;letter-spacing:3px;border-right:3px solid #e50914;padding-right:6px;min-height:1.2em;animation:blink .8s steps(1) infinite}
 @keyframes blink{50%{border-color:transparent}}
 @media (prefers-reduced-motion:reduce){#splash span{animation:none}}
+.stage{aspect-ratio:16/9;background:#000}
+.stage iframe,.stage video{width:100%;height:100%;border:0;display:block;background:#000}
+.qrow{display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px 0}
 #bell{position:relative;background:none;border:0;padding:4px;display:flex;cursor:pointer}
 #bell svg{width:24px;height:24px;stroke:var(--tx);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 #bdg{position:absolute;top:-3px;right:-5px;background:var(--red);color:#fff;border-radius:9px;font-size:.7rem;min-width:16px;padding:0 4px;text-align:center}
@@ -129,7 +132,7 @@ const store = {
 };
 const hue = t => [...String(t)].reduce((a,c)=>a+c.charCodeAt(0),0)*37 % 360;
 const grad = t => `linear-gradient(160deg,hsl(${hue(t)} 60% 32%),hsl(${(hue(t)+60)%360} 55% 14%))`;
-function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.id);toast.id=setTimeout(()=>t.classList.remove('on'),2200)}
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.id);toast.id=setTimeout(()=>t.classList.remove('on'),Math.max(2200,m.length*70))}
 
 // ---------- data ----------
 let CATS = ['Action','Comedy','Drama','Horror','Romance','Sci-Fi','Thriller','Animation','Anime','Fanime','Documentary','Family','Fantasy','Crime'];
@@ -145,6 +148,13 @@ const DEMO = ('Iron Tide|2024|Action|7.8;Last Convoy|2023|Action|7.1;Wrong Weddi
 let movies = [], cat = 'All', q = '', tab = 'home', user = null, list = [];
 let prefs = {theme:'dark',autoplay:true,saver:false,notify:true,...store.get('mv_prefs',{})};
 let seen = store.get('mv_seen',null), alerts = store.get('mv_alerts',[]);
+// --- Premium settings ---
+const UPI_ID = '';            // put your UPI ID here later, e.g. 'name@upi'
+const UPI_NAME = 'MovieVerse';
+const PRICE = 99;             // rupees per month
+let subRef = null, subUntil = 0;
+const isPremium = () => subUntil > Date.now();
+const fmtD = t => new Date(t).toLocaleDateString();
 function checkNew(){
   const ids = movies.map(m=>m.id);
   if(seen===null){ seen=ids; store.set('mv_seen',seen); return }
@@ -197,6 +207,11 @@ if (useFB) {
 }
 function setUser(u){
   user = u; $('#auth').hidden = !!u;
+  if(subRef){ subRef.off(); subRef = null } subUntil = 0;
+  if(u && useFB && !u.id.startsWith('demo') && u.email!=='Guest'){
+    subRef = db.ref('subscriptions/'+u.id+'/until');
+    subRef.on('value', s => { subUntil = Number(s.val())||0; render() }, () => {});
+  }
   list = u ? store.get('mv_list_'+u.id,[]) : [];
   if (u && useFB && !u.id.startsWith('demo')) {
     db.ref('users/'+u.id+'/list').once('value').then(s=>{ if(s.val()){list=s.val();store.set('mv_list_'+u.id,list);render()} }).catch(()=>{});
@@ -265,6 +280,7 @@ function sw(id,on){return `<button class="sw ${on?'on':''}" id="${id}" role="swi
 function renderSettings(){
   return `<h3>Settings</h3><div class="set">
     <div><div>Account<div class="meta">${esc(user?user.email:'Not signed in')}</div></div></div>
+    <div><div>Premium<div class="meta">${isPremium() ? 'Active until '+esc(fmtD(subUntil)) : '&#8377;'+PRICE+' / month &middot; unlocks 1080p'}</div></div><button class="btn alt" id="sPrem">${isPremium()?'Details':'Get Premium'}</button></div>
     <div><span>Dark theme</span>${sw('sTheme',prefs.theme==='dark')}</div>
     <div><span>Autoplay next movie</span>${sw('sAuto',prefs.autoplay)}</div>
     <div><span>Data saver (hide featured banner)</span>${sw('sSave',prefs.saver)}</div>
@@ -284,6 +300,7 @@ function render(){
   if(tab==='settings'){
     $('#sTheme').onclick=()=>{prefs.theme=prefs.theme==='dark'?'light':'dark';savePrefs();render()};
     $('#sAuto').onclick=()=>{prefs.autoplay=!prefs.autoplay;savePrefs();render()};
+    $('#sPrem').onclick=openPremium;
     $('#sSave').onclick=()=>{prefs.saver=!prefs.saver;savePrefs();render()};
     $('#sNote').onclick=async()=>{prefs.notify=!prefs.notify;savePrefs();
       if(prefs.notify && 'Notification' in window && Notification.permission==='default'){ try{await Notification.requestPermission()}catch{} }
@@ -294,35 +311,100 @@ function render(){
 }
 
 // ---------- modal ----------
-// For APK builds: set this to the HTTPS address of player.html, e.g. 'https://your-site.web.app/player.html'
-// Leave '' when the app itself is opened from an HTTPS address.
+function stopMedia(){ const v=document.querySelector('#modal video'); if(v){ v.pause(); v.removeAttribute('src'); v.load(); } }
+function closeModal(){ stopMedia(); const md=$('#modal'); md.hidden=true; md.innerHTML=''; }
+function qualitiesOf(m){
+  const q=[];
+  if(m.video) q.push({l:'480p',u:m.video});
+  if(m.video720) q.push({l:'720p',u:m.video720});
+  if(m.q1080 || m.video1080) q.push({l:'1080p',u:m.video1080||null,p:1});
+  return q;
+}
+// APK builds: YouTube needs an https address; this page gives it one
 const YT_PLAYER_PAGE = 'https://shobhaamarsingh164-hue.github.io/Hhhhhhhhaiahhw/player.html';
 function ytId(u){
   const r = String(u||'').match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?(?:.*&)?v=|embed\/|shorts\/|live\/))([\w-]{11})/);
   return r ? r[1] : null;
 }
+function stageHTML(url){
+  const yt = ytId(url);
+  if(yt){
+    const src = YT_PLAYER_PAGE ? esc(YT_PLAYER_PAGE)+'?v='+yt+'&a='+(prefs.autoplay?1:0)
+      : 'https://www.youtube.com/embed/'+yt+'?rel=0&playsinline=1'+(prefs.autoplay?'&autoplay=1':'');
+    return `<iframe src="${src}" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="Movie player"></iframe>`;
+  }
+  return `<video controls playsinline ${prefs.autoplay?'autoplay':''} src="${esc(url)}"></video>`;
+}
+async function playQ(m, q){
+  let url = q.u;
+  if(q.p){
+    if(!isPremium()){ openPremium(); return }
+    if(!url && useFB){ try{ url = (await db.ref('premium/'+m.id).once('value')).val() }catch{} }
+    if(!url){ toast('1080p is not available for this movie'); return }
+  }
+  const st = $('#pStage'); if(!st) return;
+  st.innerHTML = stageHTML(url);
+  document.querySelectorAll('#qRow .chip').forEach(c => c.classList.toggle('on', c.dataset.q===q.l));
+  const v = st.querySelector('video');
+  if(v) v.onerror = () => {
+    let msg = 'Video failed to load. Try another quality.';
+    if(url.startsWith('http:') && location.protocol==='https:') msg = 'This link starts with http. Use an https link.';
+    else if(/drive\.google\.com|dropbox\.com\/s\//i.test(url)) msg = 'This is a share page, not a direct video file link.';
+    else if(v.error && v.error.code===4) msg = 'This link is not a playable video. Use a YouTube link or a direct .mp4 link.';
+    toast(msg);
+  };
+}
 function openMovie(id){
   const m = movies.find(x=>x.id===id); if(!m) return;
-  const inList = list.includes(id);
-  const yt = ytId(m.video);
-  const media = yt
-    ? `<iframe src="${YT_PLAYER_PAGE ? esc(YT_PLAYER_PAGE)+'?v='+yt+'&a='+(prefs.autoplay?1:0) : 'https://www.youtube.com/embed/'+yt+'?rel=0&playsinline=1'+(prefs.autoplay?'&autoplay=1':'')}" referrerpolicy="strict-origin-when-cross-origin" allow="autoplay; encrypted-media; picture-in-picture; fullscreen" allowfullscreen title="${esc(m.title)}"></iframe>`
-    : m.video ? `<video controls ${prefs.autoplay?'autoplay':''} src="${esc(m.video)}"></video>` : `<div class="top" style="--g:${grad(m.title)}"></div>`;
+  const inList = list.includes(id), qs = qualitiesOf(m);
+  stopMedia();
   const md = $('#modal');
-  md.innerHTML = `<div class="sheet">${media}<div class="in">
+  md.innerHTML = `<div class="sheet"><div class="stage" id="pStage" style="background:${grad(m.title)}"></div>
+    ${qs.length>1 ? `<div class="qrow" id="qRow">${qs.map(q=>`<button class="chip" data-q="${q.l}">${q.l}${q.p?(isPremium()?' &#9733;':' &middot; Premium'):''}</button>`).join('')}</div>` : ''}
+    <div class="in">
     <h2>${esc(m.title)}</h2>
-    <div class="meta">${esc(m.year)} · ${esc(m.category)} · Rating ${esc(m.rating)}</div>
+    <div class="meta">${esc(m.year)} &middot; ${esc(m.category)} &middot; Rating ${esc(m.rating)}</div>
     <p>${esc(m.desc||'')}</p>
-    <button class="btn" id="mPlay">Play</button>
+    ${qs.length ? '' : '<div class="meta">No video has been added for this movie yet.</div>'}
     <button class="btn alt" id="mList">${inList?'Remove from My List':'Add to My List'}</button>
     <button class="link" id="mClose">Close</button></div></div>`;
   md.hidden = false;
-  $('#mClose').onclick=()=>md.hidden=true;
-  md.onclick=e=>{if(e.target===md)md.hidden=true};
-  $('#mPlay').onclick=()=>toast(m.video?'Playing above':'No video link added for this movie');
-  $('#mList').onclick=()=>{
+  $('#mClose').onclick = closeModal;
+  md.onclick = e => { if(e.target===md) closeModal() };
+  $('#mList').onclick = () => {
     list = list.includes(id) ? list.filter(x=>x!==id) : [...list,id];
-    saveList(); md.hidden=true; render(); toast(list.includes(id)?'Added to My List':'Removed from My List');
+    saveList(); closeModal(); render(); toast(list.includes(id)?'Added to My List':'Removed from My List');
+  };
+  const qr = $('#qRow');
+  if(qr) qr.onclick = e => { const b = e.target.closest('[data-q]'); if(b) playQ(m, qs.find(x=>x.l===b.dataset.q)) };
+  if(qs.length){
+    const free = qs.filter(q=>!q.p);
+    if(free.length) playQ(m, free[free.length-1]);
+    else $('#pStage').innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center"><button class="btn" id="goPrem">Get Premium to watch</button></div>', $('#goPrem').onclick = openPremium;
+  }
+}
+function openPremium(){
+  stopMedia();
+  const md = $('#modal'), guest = !user || user.email==='Guest', enc = encodeURIComponent;
+  md.innerHTML = `<div class="sheet"><div class="in"><h2>MovieVerse Premium</h2>
+    <p>&#8377;${PRICE} per month. Watch every movie in 1080p Full HD.</p>
+    ${isPremium() ? `<div class="meta">Your Premium is active until ${esc(fmtD(subUntil))}. You can renew early below.</div>` : ''}
+    ${guest ? '<div class="meta">Please log in with an email account (not guest) to buy Premium.</div>'
+     : !UPI_ID ? '<div class="meta">Payments will open soon.</div>'
+     : `<a class="btn" style="text-align:center;text-decoration:none" href="upi://pay?pa=${enc(UPI_ID)}&pn=${enc(UPI_NAME)}&am=${PRICE}&cu=INR&tn=${enc('MovieVerse Premium')}">Pay &#8377;${PRICE} with UPI</a>
+        <div class="meta">After paying, enter the 12-digit UPI transaction ID (UTR) from your payment app.</div>
+        <input id="utr" inputmode="numeric" maxlength="12" placeholder="UTR / transaction ID" style="background:var(--bg);border:1px solid var(--bd);border-radius:8px;padding:12px;color:var(--tx)">
+        <button class="btn alt" id="utrGo">I have paid, submit</button>
+        <div class="meta">Premium turns on after we verify your payment, usually within a day.</div>`}
+    <button class="link" id="mClose">Close</button></div></div>`;
+  md.hidden = false; $('#mClose').onclick = closeModal; md.onclick = e => { if(e.target===md) closeModal() };
+  const go = $('#utrGo');
+  if(go) go.onclick = async () => {
+    const utr = $('#utr').value.trim();
+    if(!/^\d{12}$/.test(utr)) return toast('Enter the 12-digit transaction ID');
+    if(!useFB) return toast('Needs Firebase');
+    try{ await db.ref('payments/'+user.id).push({utr, email:user.email, amount:PRICE, t:Date.now(), status:'pending'}); closeModal(); toast('Submitted. Premium turns on after we verify.') }
+    catch(x){ toast('Could not submit. Try again.') }
   };
 }
 
