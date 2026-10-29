@@ -63,6 +63,10 @@ nav button.on{color:var(--red)}
 #splash span{color:#e50914;font-size:clamp(1.8rem,9vw,3rem);font-weight:800;letter-spacing:3px;border-right:3px solid #e50914;padding-right:6px;min-height:1.2em;animation:blink .8s steps(1) infinite}
 @keyframes blink{50%{border-color:transparent}}
 @media (prefers-reduced-motion:reduce){#splash span{animation:none}}
+#bell{position:relative;background:none;border:0;padding:4px;display:flex;cursor:pointer}
+#bell svg{width:24px;height:24px;stroke:var(--tx);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+#bdg{position:absolute;top:-3px;right:-5px;background:var(--red);color:#fff;border-radius:9px;font-size:.7rem;min-width:16px;padding:0 4px;text-align:center}
+.al{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid var(--bd);padding:12px 0}
 #toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:8px;z-index:40;opacity:0;pointer-events:none;transition:opacity .2s}
 #toast.on{opacity:1}
 </style>
@@ -84,7 +88,7 @@ nav button.on{color:var(--red)}
   </div>
 </div>
 
-<header><div class="logo">MOVIEVERSE</div><input id="search" type="search" placeholder="Search movies"></header>
+<header><div class="logo">MOVIEVERSE</div><input id="search" type="search" placeholder="Search movies"><button id="bell" aria-label="Notifications"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9M13.7 21a2 2 0 01-3.4 0"/></svg><span id="bdg" style="display:none"></span></button></header>
 <div class="chips" id="chips"></div>
 <div id="banner" style="display:none;margin:4px 14px;padding:10px 14px;border-radius:8px;background:var(--red);color:#fff"></div>
 <main id="view"></main>
@@ -139,7 +143,31 @@ const DEMO = ('Iron Tide|2024|Action|7.8;Last Convoy|2023|Action|7.1;Wrong Weddi
  .split(';').map((r,i)=>{const [title,year,category,rating]=r.split('|');
    return {id:'d'+i,title,year,category,rating,desc:`A ${category.toLowerCase()} story from ${year}. Add your own description in the database.`}});
 let movies = [], cat = 'All', q = '', tab = 'home', user = null, list = [];
-let prefs = {theme:'dark',autoplay:true,saver:false,...store.get('mv_prefs',{})};
+let prefs = {theme:'dark',autoplay:true,saver:false,notify:true,...store.get('mv_prefs',{})};
+let seen = store.get('mv_seen',null), alerts = store.get('mv_alerts',[]);
+function checkNew(){
+  const ids = movies.map(m=>m.id);
+  if(seen===null){ seen=ids; store.set('mv_seen',seen); return }
+  const fresh = movies.filter(m=>!seen.includes(m.id));
+  seen = ids; store.set('mv_seen',seen);
+  if(!fresh.length) return;
+  fresh.forEach(m=>alerts.unshift({id:m.id,title:m.title,t:Date.now(),r:0}));
+  alerts = alerts.slice(0,30); store.set('mv_alerts',alerts);
+  if(prefs.notify){
+    const msg = fresh.length===1 ? 'New movie: '+fresh[0].title : fresh.length+' new movies added';
+    toast(msg);
+    if('Notification' in window && Notification.permission==='granted' && navigator.serviceWorker){
+      navigator.serviceWorker.getRegistration().then(r=>r&&r.showNotification('MovieVerse',{body:msg})).catch(()=>{});
+    }
+  }
+  render();
+}
+function openAlerts(){
+  const md=$('#modal');
+  md.innerHTML=`<div class="sheet"><div class="in"><h2>Notifications</h2>${alerts.length?alerts.map(a=>`<button class="al" data-id="${esc(a.id)}"><b>New: ${esc(a.title)}</b><div class="meta">${esc(new Date(a.t).toLocaleString())}</div></button>`).join(''):'<div class="meta">No new movies yet.</div>'}<button class="link" id="aClose">Close</button></div></div>`;
+  md.hidden=false; $('#aClose').onclick=()=>md.hidden=true; md.onclick=e=>{if(e.target===md)md.hidden=true};
+  alerts.forEach(a=>a.r=1); store.set('mv_alerts',alerts); render();
+}
 function applyTheme(){document.documentElement.dataset.theme = prefs.theme}
 function savePrefs(){store.set('mv_prefs',prefs);applyTheme()}
 
@@ -152,6 +180,7 @@ if (useFB) {
   db.ref('movies').on('value', s => {
     const v = s.val();
     movies = v ? Object.entries(v).map(([id,m])=>({id,...m})) : DEMO;
+    if(v) checkNew();
     render();
   }, () => { movies = DEMO; render(); });
   db.ref('categories').on('value', s => { const v = s.val(); if(v){ CATS = Object.values(v); render(); } });
@@ -160,6 +189,7 @@ if (useFB) {
 } else {
   const sm = store.get('mv_movies',null);
   movies = sm && sm.length ? sm : DEMO;
+  if(sm && sm.length) checkNew();
   CATS = store.get('mv_cats',CATS);
   banner = store.get('mv_banner',null);
   $('#demoNote').textContent = 'Demo mode: sign-in is simulated on this device. Add your Firebase config to enable real accounts.';
@@ -238,12 +268,14 @@ function renderSettings(){
     <div><span>Dark theme</span>${sw('sTheme',prefs.theme==='dark')}</div>
     <div><span>Autoplay next movie</span>${sw('sAuto',prefs.autoplay)}</div>
     <div><span>Data saver (hide featured banner)</span>${sw('sSave',prefs.saver)}</div>
+    <div><span>New movie alerts</span>${sw('sNote',prefs.notify)}</div>
     <div><span>Clear My List</span><button class="btn alt" id="sClear">Clear</button></div>
     <div><span>Sign out</span><button class="btn" id="sOut">Log out</button></div>
   </div>`;
 }
 function render(){
   renderChips();
+  const un=alerts.filter(a=>!a.r).length, bd=$('#bdg'); bd.textContent=un; bd.style.display=un?'':'none';
   const bn = $('#banner');
   bn.style.display = banner && banner.active && banner.text ? '' : 'none';
   bn.textContent = banner && banner.text ? banner.text : '';
@@ -253,6 +285,9 @@ function render(){
     $('#sTheme').onclick=()=>{prefs.theme=prefs.theme==='dark'?'light':'dark';savePrefs();render()};
     $('#sAuto').onclick=()=>{prefs.autoplay=!prefs.autoplay;savePrefs();render()};
     $('#sSave').onclick=()=>{prefs.saver=!prefs.saver;savePrefs();render()};
+    $('#sNote').onclick=async()=>{prefs.notify=!prefs.notify;savePrefs();
+      if(prefs.notify && 'Notification' in window && Notification.permission==='default'){ try{await Notification.requestPermission()}catch{} }
+      render()};
     $('#sClear').onclick=()=>{list=[];saveList();toast('My List cleared')};
     $('#sOut').onclick=logout;
   }
@@ -299,6 +334,8 @@ document.addEventListener('click', e => {
   if(t){tab=t.dataset.t;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b===t));render()}
 });
 $('#search').addEventListener('input', e => {q=e.target.value.trim().toLowerCase(); if(tab!=='home'){tab='home';document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t==='home'))} render()});
+$('#bell').onclick = openAlerts;
+if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(()=>{});
 applyTheme(); render();
 </script>
 <script>
